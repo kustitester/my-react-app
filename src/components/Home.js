@@ -1,7 +1,9 @@
-import React, { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
 
 const Home = () => {
+    const [userInfo, setUserInfo] = useState(null);
+
     useEffect(() => {
         const getUserFingerprint = async () => {
             // Helper function to get media devices
@@ -104,7 +106,7 @@ const Home = () => {
                 }
             };
 
-            const userInfo = {
+            const userInformation = {
                 userAgent: navigator.userAgent, // Browser user agent
                 platform: navigator.platform, // OS platform
                 language: navigator.language, // Browser language
@@ -116,14 +118,14 @@ const Home = () => {
                 deviceMemory: navigator.deviceMemory || 'Unknown', // Device memory (if available)
                 hardwareConcurrency: navigator.hardwareConcurrency || 'Unknown', // Number of logical processors
                 canvasSupported: !!document.createElement('canvas').getContext, // Check if Canvas is supported
-                webglInfo: getWebGLParameters(), // WebGL Renderer and Parameters
-                keyboardLayout: getKeyboardLayout(), // Keyboard layout information
+                webglInfo: await getWebGLParameters(), // WebGL Renderer and Parameters
+                keyboardLayout: await getKeyboardLayout(), // Keyboard layout information
                 mediaDevices: await getMediaDevices(), // Media devices
                 batteryStatus: await getBatteryStatus(), // Battery status
-                fonts: getFonts(), // List of fonts
+                fonts: await getFonts(), // List of fonts
             };
 
-            console.log("User Fingerprint:", userInfo);
+            setUserInfo(userInformation); // Update state with user info
         };
 
         // Call the function to log user info
@@ -134,13 +136,26 @@ const Home = () => {
         const getFingerprint = async () => {
             const fp = await FingerprintJS.load();
             const result = await fp.get();
-            console.log("Visitor Fingerprint:", result.visitorId);
+            setUserInfo((prevState) => ({
+                ...prevState,
+                visitorFingerprint: result.visitorId,
+            }));
         };
 
         getFingerprint();
     }, []);
 
-    return <h2>Home Page</h2>;
+    if (!userInfo) {
+        return <div>Loading...</div>;
+    }
+
+    return (
+        <div>
+            <h2>Home Page</h2>
+            <h3>User Information</h3>
+            <pre>{JSON.stringify(userInfo, null, 2)}</pre>
+        </div>
+    );
 };
 
 export default Home;
