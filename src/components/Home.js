@@ -1,8 +1,73 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
 
+const openDB = () => {
+    return new Promise((resolve, reject) => {
+        const request = window.indexedDB.open("RandomNumberDB", 1); // Create or open the database
+        request.onupgradeneeded = () => {
+            const db = request.result;
+            if (!db.objectStoreNames.contains("randomNumbers")) {
+                db.createObjectStore("randomNumbers", { keyPath: "id" });
+            }
+        };
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject('Error opening IndexedDB');
+    });
+};
+
+// Function to get the random number from IndexedDB
+const getRandomNumberFromDB = async () => {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction("randomNumbers", "readonly");
+        const store = transaction.objectStore("randomNumbers");
+        const request = store.get(1); // Get the random number with key 1
+        request.onsuccess = () => {
+            resolve(request.result ? request.result.value : null); // Return the random number if it exists
+        };
+        request.onerror = () => reject('Error retrieving from IndexedDB');
+    });
+};
+
+// Function to store the random number in IndexedDB
+const storeRandomNumberInDB = async (randomNumber) => {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction("randomNumbers", "readwrite");
+        const store = transaction.objectStore("randomNumbers");
+        const request = store.put({ id: 1, value: randomNumber }); // Store with key 1
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject('Error storing in IndexedDB');
+    });
+};
+
+
 const Home = () => {
-    const [userInfo, setUserInfo] = useState(null);
+    const [userInfo, setUserInfo] = useState({});
+
+    const [randomNumber, setRandomNumber] = useState(null);
+
+    // Function to generate a random number
+    const generateRandomNumber = () => {
+        return Math.floor(Math.random() * 1000000); // Random number between 0 and 999999
+    };
+
+    useEffect(() => {
+        // Try to retrieve the random number from IndexedDB
+        const fetchRandomNumber = async () => {
+            const storedRandomNumber = await getRandomNumberFromDB();
+            if (storedRandomNumber !== null) {
+                setRandomNumber(storedRandomNumber);
+            } else {
+                // If no number exists, generate a new random number and store it
+                const newRandomNumber = generateRandomNumber();
+                await storeRandomNumberInDB(newRandomNumber);
+                setRandomNumber(newRandomNumber);
+            }
+        };
+
+        fetchRandomNumber();
+    }, []); // Empty dependency array ensures this runs once when the component mounts
 
     useEffect(() => {
         const getUserFingerprint = async () => {
@@ -106,7 +171,88 @@ const Home = () => {
                 }
             };
 
-            const userInformation = {
+            // Helper function to get geolocation
+            const getGeolocation = async () => {
+                try {
+                    const position = await new Promise((resolve, reject) => {
+                        navigator.geolocation.getCurrentPosition(resolve, reject);
+                    });
+                    return {
+                        latitude: position.coords.latitude,
+                        longitude: position.coords.longitude,
+                        accuracy: position.coords.accuracy, // Accuracy of the location
+                    };
+                } catch (error) {
+                    return 'Error retrieving geolocation';
+                }
+            };
+
+            // Helper function to get IP address (via external API)
+            const getIpAddress = async () => {
+                try {
+                    const response = await fetch('https://api.ipify.org?format=json');
+                    const data = await response.json();
+                    return data.ip;
+                } catch (error) {
+                    return 'Error retrieving IP address';
+                }
+            };
+
+            // Helper function to get network information
+            const getNetworkInfo = () => {
+                try {
+                    const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+                    return connection
+                        ? {
+                            effectiveType: connection.effectiveType, // 'slow-2g', '2g', '3g', '4g'
+                            downlink: connection.downlink, // Maximum downlink speed (Mbps)
+                            rtt: connection.rtt, // Round-trip time (ms)
+                            saveData: connection.saveData, // Whether the user has "Save Data" mode on
+                        }
+                        : 'Network Information Not Supported';
+                } catch {
+                    return 'Error retrieving network information';
+                }
+            };
+
+            // Helper function to get device orientation
+            const getDeviceOrientation = () => {
+                try {
+                    const orientation = {
+                        alpha: window.orientation || null, // Rotation around the z-axis (compass heading)
+                        beta: null, // Rotation around the x-axis (forward/backward tilt)
+                        gamma: null, // Rotation around the y-axis (left/right tilt)
+                    };
+                    window.addEventListener('deviceorientation', (e) => {
+                        orientation.alpha = e.alpha;
+                        orientation.beta = e.beta;
+                        orientation.gamma = e.gamma;
+                    });
+                    return orientation;
+                } catch {
+                    return 'Error retrieving device orientation';
+                }
+            };
+
+            // Helper function to check storage support
+            const getStorageSupport = () => {
+                return {
+                    localStorage: typeof localStorage !== 'undefined' ? 'Available' : 'Not Available',
+                    sessionStorage: typeof sessionStorage !== 'undefined' ? 'Available' : 'Not Available',
+                };
+            };
+
+            // Helper function to get screen information
+            const getScreenInfo = () => ({
+                screenWidth: window.screen.width,
+                screenHeight: window.screen.height,
+                screenColorDepth: window.screen.colorDepth,
+                screenPixelDepth: window.screen.pixelDepth, // Screen pixel depth (bits per pixel)
+                screenAvailableWidth: window.screen.availWidth, // Available screen width (excluding taskbars)
+                screenAvailableHeight: window.screen.availHeight, // Available screen height
+            });
+
+            const userInfo = {
                 userAgent: navigator.userAgent, // Browser user agent
                 platform: navigator.platform, // OS platform
                 language: navigator.language, // Browser language
@@ -118,14 +264,20 @@ const Home = () => {
                 deviceMemory: navigator.deviceMemory || 'Unknown', // Device memory (if available)
                 hardwareConcurrency: navigator.hardwareConcurrency || 'Unknown', // Number of logical processors
                 canvasSupported: !!document.createElement('canvas').getContext, // Check if Canvas is supported
-                webglInfo: await getWebGLParameters(), // WebGL Renderer and Parameters
-                keyboardLayout: await getKeyboardLayout(), // Keyboard layout information
+                webglInfo: getWebGLParameters(), // WebGL Renderer and Parameters
+                keyboardLayout: getKeyboardLayout(), // Keyboard layout information
                 mediaDevices: await getMediaDevices(), // Media devices
                 batteryStatus: await getBatteryStatus(), // Battery status
-                fonts: await getFonts(), // List of fonts
+                fonts: getFonts(), // List of fonts
+                geolocation: await getGeolocation(), // Geolocation
+                ipAddress: await getIpAddress(), // IP Address
+                networkInfo: getNetworkInfo(), // Network information
+                deviceOrientation: getDeviceOrientation(), // Device orientation
+                storageSupport: getStorageSupport(), // LocalStorage / SessionStorage support
+                screenInfo: getScreenInfo(), // Screen information
             };
 
-            setUserInfo(userInformation); // Update state with user info
+            setUserInfo(userInfo);
         };
 
         // Call the function to log user info
@@ -136,24 +288,21 @@ const Home = () => {
         const getFingerprint = async () => {
             const fp = await FingerprintJS.load();
             const result = await fp.get();
-            setUserInfo((prevState) => ({
-                ...prevState,
-                visitorFingerprint: result.visitorId,
-            }));
+            console.log("Visitor Fingerprint:", result.visitorId);
         };
 
         getFingerprint();
     }, []);
 
-    if (!userInfo) {
-        return <div>Loading...</div>;
-    }
-
     return (
         <div>
             <h2>Home Page</h2>
-            <h3>User Information</h3>
-            <pre>{JSON.stringify(userInfo, null, 2)}</pre>
+            <div>
+                <h3>User Information:</h3>
+                <pre>{JSON.stringify(userInfo, null, 2)}</pre>
+                <h3>Random Number:</h3>
+                <p>{randomNumber}</p> {/* Display the random number */}
+            </div>
         </div>
     );
 };
