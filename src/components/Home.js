@@ -252,6 +252,38 @@ const Home = () => {
                 screenAvailableHeight: window.screen.availHeight, // Available screen height
             });
 
+            const getCanvasFingerprint = () => {
+                // Create a canvas element
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+            
+                // Set canvas dimensions
+                canvas.width = 200;
+                canvas.height = 200;
+            
+                // Draw some random text on the canvas (this varies depending on fonts)
+                ctx.textBaseline = 'top';
+                ctx.font = '16px Arial'; // Try different fonts and sizes to make it more unique
+                ctx.fillText('Canvas Fingerprint Test', 2, 2);
+            
+                // Draw some additional graphics (this can add more uniqueness)
+                ctx.fillRect(50, 50, 100, 100);
+            
+                // Get the image data (pixel data)
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            
+                // Convert the image data to a hash string
+                const data = imageData.data;
+                let hash = 0;
+            
+                for (let i = 0; i < data.length; i++) {
+                    hash += data[i]; // Simple accumulation (or you can use more advanced hashing)
+                }
+            
+                // Return the hash as a unique fingerprint
+                return hash.toString();
+            };
+
             const userInfo = {
                 userAgent: navigator.userAgent, // Browser user agent
                 platform: navigator.platform, // OS platform
@@ -275,6 +307,7 @@ const Home = () => {
                 deviceOrientation: getDeviceOrientation(), // Device orientation
                 storageSupport: getStorageSupport(), // LocalStorage / SessionStorage support
                 screenInfo: getScreenInfo(), // Screen information
+                canvasFingerprint: getCanvasFingerprint(),
             };
 
             setUserInfo(userInfo);
