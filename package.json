@@ -3,8 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
-    "@fingerprintjs/fingerprintjs": "^4.5.1",
+    "@fingerprintjs/fingerprintjs": "^4.6.2",
     "cra-template": "1.2.0",
+    "fingerprintjs2": "^2.1.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.0.2",
